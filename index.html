@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Локатор Зоны 0</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #0d0f12;
+            color: #00ff66;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+            text-align: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 420px;
+            border: 2px solid #00ff66;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.25);
+            background: #14181d;
+        }
+        h1 {
+            font-size: 1.4rem;
+            margin-top: 0;
+            letter-spacing: 2px;
+            border-bottom: 1px solid #00ff66;
+            padding-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .status-box {
+            font-size: 0.95rem;
+            color: #ffcc00;
+            margin: 15px 0 10px 0;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.3;
+        }
+
+        /* --- СТИЛИ ДЛЯ ШКАЛЫ СИГНАЛА --- */
+        .scale-title {
+            font-size: 0.75rem;
+            color: #78909c;
+            text-align: left;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+        .signal-container {
+            width: 100%;
+            height: 22px;
+            background-color: #080a0c;
+            border: 1px solid #00ff66;
+            border-radius: 4px;
+            padding: 2px;
+            margin-bottom: 15px;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
+        }
+        .signal-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffcc00 0%, #ff3300 70%, #00ff66 100%);
+            border-radius: 2px;
+            transition: width 0.4s ease-out;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+        }
+        /* ------------------------------- */
+
+        .distance-box {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #ffffff;
+            text-shadow: 0 0 12px #00ff66;
+        }
+        .accuracy {
+            font-size: 0.8rem;
+            color: #78909c;
+            margin-bottom: 15px;
+        }
+        .btn {
+            background: #00ff66;
+            color: #000;
+            border: none;
+            padding: 16px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            letter-spacing: 1px;
+            box-shadow: 0 0 12px rgba(0,255,102,0.4);
+            transition: transform 0.1s, background 0.2s;
+        }
+        .btn:active {
+            transform: scale(0.98);
+            background: #00cc52;
+        }
+        .warning-box {
+            background: #330000;
+            border: 1px solid #ff3333;
+            color: #ff9999;
+            padding: 10px;
+            font-size: 0.8rem;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: none;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>AQ-ДЕТЕКТОР AQ11</h1>
+        <div id="status" class="status-box">Нажмите кнопку для активации сенсоров</div>
+        
+        <!-- Графическая шкала -->
+        <div class="scale-title">УРОВЕНЬ ИЗЛУЧЕНИЯ МАЯЧКА:</div>
+        <div class="signal-container">
+            <div id="signalBar" class="signal-bar"></div>
+        </div>
+
+        <div id="distance" class="distance-box">--- м</div>
+        <div id="accuracy" class="accuracy">Точность GPS: ---</div>
+        
+        <button id="startBtn" class="btn">АКТИВИРОВАТЬ ДЕТЕКТОР</button>
+        
+        <div id="warning" class="warning-box"></div>
+    </div>
+
+    <script>
+        // =======================================================
+        // КОНФИГУРАЦИЯ ОБЪЕКТА (Заполните координаты центра здания)
+        // =======================================================
+        const TARGET_LAT = 56.359715; // Широта  56.359715, 44.054371
+        const TARGET_LNG = 44.054371; // Долгота
+        const MAX_DETECTION_DIST = 3000; // Дистанция начала обнаружения (в метрах)
+        // =======================================================
+
+        const statusEl = document.getElementById('status');
+        const distanceEl = document.getElementById('distance');
+        const accuracyEl = document.getElementById('accuracy');
+        const startBtn = document.getElementById('startBtn');
+        const warningEl = document.getElementById('warning');
+        const signalBarEl = document.getElementById('signalBar');
+
+        let audioCtx = null;
+        let currentInterval = 0;
+        let watchId = null;
+
+        // Проверка HTTPS
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            warningEl.style.display = 'block';
+            warningEl.innerHTML = '⚠️ <b>ОШИБКА БЕЗОПАСНОСТИ:</b> Сайт открыт без шифрования (HTTP). Запустите страницу через <b>HTTPS</b>.';
+        }
+
+        // Формула Гаверсинусов
+        function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
+        }
+
+        // Инициализация Web Audio API
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Звуковой писк
+        function playBeep() {
+            if (!audioCtx || audioCtx.state !== 'running') return;
+
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.07);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.07);
+            } catch (e) {
+                console.error("Ошибка звука:", e);
+            }
+        }
+
+        // Цикл звука
+        function soundLoop() {
+            if (currentInterval > 0) {
+                playBeep();
+                setTimeout(soundLoop, currentInterval);
+            } else {
+                setTimeout(soundLoop, 500);
+            }
+        }
+
+        // Расчет процентов заполнения шкалы
+        function updateSignalBar(dist) {
+            if (dist >= MAX_DETECTION_DIST) {
+                signalBarEl.style.width = '0%';
+                return;
+            }
+            // Шкала закрашивается от 0% (на 500м) до 100% (на 15м и ближе)
+            let percentage = Math.round(((MAX_DETECTION_DIST - dist) / (MAX_DETECTION_DIST - 15)) * 100);
+            if (percentage < 3) percentage = 3; // Минимальная видимая риска
+            if (percentage > 100) percentage = 100;
+            
+            signalBarEl.style.width = percentage + '%';
+        }
+
+        // Обновление состояния детектора
+        function updateDetectorState(dist) {
+            const roundedDist = Math.round(dist);
+            updateSignalBar(dist);
+
+            if (dist > MAX_DETECTION_DIST) {
+                currentInterval = 0;
+                statusEl.style.color = '#ffcc00';
+                statusEl.textContent = 'Сканирование... Полезный сигнал не обнаружен';
+                distanceEl.textContent = '--- м';
+            } else if (dist > 250) {
+                currentInterval = 1200;
+                statusEl.style.color = '#ffcc00';
+                statusEl.textContent = 'Фиксация слабого аномального фонового поля';
+                distanceEl.textContent = roundedDist + ' м';
+            } else if (dist > 80) {
+                currentInterval = 400;
+                statusEl.style.color = '#ff9900';
+                statusEl.textContent = 'ВНИМАНИЕ: Рост концентрации реагента!';
+                distanceEl.textContent = roundedDist + ' м';
+            } else if (dist > 25) {
+                currentInterval = 120;
+                statusEl.style.color = '#ff3300';
+                statusEl.textContent = 'ОПАСНОСТЬ: Вход в эпицентр!';
+                distanceEl.textContent = roundedDist + ' м';
+            } else {
+                currentInterval = 50;
+                statusEl.style.color = '#00ff66';
+                statusEl.textContent = 'ОБЪЕКТ ОБНАРУЖЕН! ИЩИТЕ КОД В ЭТОМ ЗДАНИИ!';
+                distanceEl.textContent = roundedDist + ' м';
+            }
+        }
+
+        // Запуск
+        function startSearch() {
+            initAudio();
+            startBtn.style.display = 'none';
+            statusEl.textContent = 'Связь со спутниками GPS... Выйдите на открытое место.';
+
+            if (!("geolocation" in navigator)) {
+                statusEl.style.color = '#ff3333';
+                statusEl.textContent = 'Ошибка: Ваше устройство не поддерживает модуль геолокации.';
+                return;
+            }
+
+            soundLoop();
+
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+
+            watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const userLat = pos.coords.latitude;
+                    const userLng = pos.coords.longitude;
+                    const acc = Math.round(pos.coords.accuracy);
+
+                    accuracyEl.textContent = `Точность GPS: ±${acc} м`;
+
+                    const dist = getDistanceInMeters(userLat, userLng, TARGET_LAT, TARGET_LNG);
+                    updateDetectorState(dist);
+                },
+                (err) => {
+                    let msg = '';
+                    switch(err.code) {
+                        case err.PERMISSION_DENIED:
+                            msg = 'ДОСТУП ОТКЛОНЕН! Проверьте разрешения в настройках.';
+                            break;
+                        case err.POSITION_UNAVAILABLE:
+                            msg = 'СБРОС СИГНАЛА GPS! Проверьте, включен ли геолокатор.';
+                            break;
+                        case err.TIMEOUT:
+                            msg = 'ТАЙМ-АУТ GPS! Поиск спутников затянулся.';
+                            break;
+                        default:
+                            msg = 'Сбой GPS: ' + err.message;
+                    }
+                    statusEl.style.color = '#ff3333';
+                    statusEl.innerHTML = msg;
+                },
+                options
+            );
+        }
+
+        startBtn.addEventListener('click', startSearch);
+    </script>
+</body>
+</html>
