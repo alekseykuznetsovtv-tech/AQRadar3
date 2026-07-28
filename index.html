@@ -123,11 +123,11 @@
 <body>
 
     <div class="container">
-        <h1>AQ-ДЕТЕКТОР AQ11</h1>
+        <h1>ДЕТЕКТОР - AQ11</h1>
         <div id="status" class="status-box">Нажмите кнопку для активации сенсоров</div>
         
         <!-- Графическая шкала -->
-        <div class="scale-title">УРОВЕНЬ ИЗЛУЧЕНИЯ МАЯЧКА:</div>
+        <div class="scale-title">УРОВЕНЬ ИЗЛУЧЕНИЯ МАЯКА:</div>
         <div class="signal-container">
             <div id="signalBar" class="signal-bar"></div>
         </div>
@@ -144,9 +144,9 @@
         // =======================================================
         // КОНФИГУРАЦИЯ ОБЪЕКТА (Заполните координаты центра здания)
         // =======================================================
-        const TARGET_LAT = 56.359715; // Широта  56.359715, 44.054371
-        const TARGET_LNG = 44.054371; // Долгота
-        const MAX_DETECTION_DIST = 3000; // Дистанция начала обнаружения (в метрах)
+        const TARGET_LAT = 67.627955; // Широта  67.627955, 64.082223
+        const TARGET_LNG = 64.082223; // Долгота
+        const MAX_DETECTION_DIST = 15000; // Дистанция начала обнаружения (в метрах)
         // =======================================================
 
         const statusEl = document.getElementById('status');
@@ -254,17 +254,17 @@
             } else if (dist > 250) {
                 currentInterval = 1200;
                 statusEl.style.color = '#ffcc00';
-                statusEl.textContent = 'Фиксация слабого аномального фонового поля';
+                statusEl.textContent = 'Фиксация слабого фонового поля';
                 distanceEl.textContent = roundedDist + ' м';
             } else if (dist > 80) {
                 currentInterval = 400;
                 statusEl.style.color = '#ff9900';
-                statusEl.textContent = 'ВНИМАНИЕ: Рост концентрации реагента!';
+                statusEl.textContent = 'ВНИМАНИЕ: Рост уровня сигнала!';
                 distanceEl.textContent = roundedDist + ' м';
             } else if (dist > 25) {
                 currentInterval = 120;
                 statusEl.style.color = '#ff3300';
-                statusEl.textContent = 'ОПАСНОСТЬ: Вход в эпицентр!';
+                statusEl.textContent = 'Внимание!: Максмальный уровень сигнала!';
                 distanceEl.textContent = roundedDist + ' м';
             } else {
                 currentInterval = 50;
