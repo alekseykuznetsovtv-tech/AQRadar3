@@ -241,7 +241,7 @@
             signalBarEl.style.width = percentage + '%';
         }
 
-        // Обновление состояния детектора
+         // Обновление состояния детектора
         function updateDetectorState(dist) {
             const roundedDist = Math.round(dist);
             updateSignalBar(dist);
@@ -254,7 +254,7 @@
             } else if (dist > 250) {
                 currentInterval = 1200;
                 statusEl.style.color = '#ffcc00';
-                statusEl.textContent = 'Фиксация слабого фонового поля';
+                statusEl.textContent = 'Фиксация слабого сигнала';
                 distanceEl.textContent = roundedDist + ' м';
             } else if (dist > 80) {
                 currentInterval = 400;
@@ -269,11 +269,10 @@
             } else {
                 currentInterval = 50;
                 statusEl.style.color = '#00ff66';
-                statusEl.textContent = 'ОБЪЕКТ ОБНАРУЖЕН! ИЩИТЕ КОД В ЭТОМ ЗДАНИИ!';
+                statusEl.textContent = 'Максимальное приближение к объекту!';
                 distanceEl.textContent = roundedDist + ' м';
             }
         }
-
         // Запуск
         function startSearch() {
             initAudio();
